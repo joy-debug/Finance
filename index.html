@@ -416,16 +416,45 @@ canvas{width:100% !important; height:100% !important; display:block;}
         recognition.onerror = (event) => { showToast(`Errore: ${event.error}`); };
     }
     function processVoiceCommand(transcript) {
-        const amountRegex = /(\d+([.,]\d{1,2})?)\s*(euro|eur|€)/i; const amountMatch = transcript.match(amountRegex);
-        if (!amountMatch) { showToast('Importo non capito. Prova a dire "spesa di 10 euro per caffè".'); return; }
-        let amount = parseFloat(amountMatch[1].replace(',', '.')); let type = 'expense';
-        if (/(entrata|accredito|ricevuto|guadagnato)/i.test(transcript)) { type = 'income'; }
-        if (type === 'expense') amount = -Math.abs(amount); else amount = Math.abs(amount);
-        let description = transcript.replace(amountRegex, '').replace(/(aggiungi|registra|nuova|nuovo|un'|un|una|spesa|costo|uscita|entrata|accredito|di|per|da)/gi, '').replace(/\s\s+/g, ' ').trim();
-        description = description.charAt(0).toUpperCase() + description.slice(1) || 'Transazione vocale';
-        addTransaction({ date: nowISO(), description, amount, type, category: guessCategory(description) || '' });
-        showToast(`Aggiunto: ${description} (${fmt(amount)})`);
+    // regex che accetta "15 euro", "euro 15", "un euro"
+    const amountRegex = /(?:(\d+([.,]\d{1,2})?)\s*(euro|eur|€)|(euro|eur|€)\s*(\d+([.,]\d{1,2})?)|(un|una)\s*euro)/i;
+    const amountMatch = transcript.match(amountRegex);
+
+    if (!amountMatch) {
+        showToast('Importo non capito. Prova a dire "spesa di 10 euro per caffè".');
+        return;
     }
+
+    let amount = 0;
+    if (amountMatch[1]) {
+        // "15 euro"
+        amount = parseFloat(amountMatch[1].replace(',', '.'));
+    } else if (amountMatch[5]) {
+        // "euro 15"
+        amount = parseFloat(amountMatch[5].replace(',', '.'));
+    } else if (amountMatch[7]) {
+        // "un euro" / "una euro"
+        amount = 1;
+    }
+
+    let type = 'expense';
+    if (/(entrata|accredito|ricevuto|guadagnato)/i.test(transcript)) {
+        type = 'income';
+    }
+    if (type === 'expense') amount = -Math.abs(amount); else amount = Math.abs(amount);
+
+    // ripulisce la descrizione togliendo "euro 15" ecc.
+    let description = transcript.replace(amountRegex, '')
+        .replace(/(aggiungi|registra|nuova|nuovo|spesa|costo|uscita|entrata|accredito|di|per|da)/gi, '')
+        .replace(/\s\s+/g, ' ')
+        .trim();
+
+    description = description.charAt(0).toUpperCase() + description.slice(1) || 'Transazione vocale';
+
+    addTransaction({ date: nowISO(), description, amount, type, category: guessCategory(description) || '' });
+    showToast(`Aggiunto: ${description} (${fmt(amount)})`);
+}
+
 
     /* ---------- CSV import/export ---------- */
     $('importCsvBtn')?.addEventListener('click', () => $('file')?.click());
