@@ -43,9 +43,11 @@ h1{font-size:1.15rem;margin:0}
 .top-controls{display:flex;gap:8px;align-items:center;margin-bottom:12px}
 .search{flex:1;display:flex;gap:8px}
 .search input, .filter select{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.2);color:inherit;width:100%}
-.balance-card{background:linear-gradient(145deg, #101a30, #0c1427); padding:20px; border-radius:var(--radius); text-align:center; margin-bottom:14px;}
+.balance-card{background:linear-gradient(145deg, #101a30, #0c1427); padding:20px; border-radius:var(--radius); margin-bottom:14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: center;}
+.balance-card .main-balance { grid-column: 1 / -1; }
 .balance-card .label{font-size:0.9rem; color:var(--muted); margin-bottom:6px;}
-.balance-card .amount{font-size:2.2rem; font-weight:700; color:#fff;}
+.balance-card .amount{font-size:1.5rem; font-weight:700; color:#fff;}
+.balance-card .main-balance .amount { font-size: 2.2rem; }
 .tx-list{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;}
 .tx-item{background:var(--card); padding:10px; border-radius:12px; display:flex; align-items:center; gap:12px;}
 .tx-item .icon{width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; background:var(--glass); flex-shrink:0;}
@@ -142,9 +144,20 @@ canvas{width:100% !important; height:100% !important; display:block;}
 
   <!-- VISTA HOME -->
   <div id="homeView" class="view active">
-      <div class="balance-card" role="region" aria-label="Saldo">
-        <div class="label">Saldo Attuale</div>
-        <div class="amount" id="balance">€0.00</div>
+      <!-- MODIFICA: La card del saldo ora mostra il patrimonio totale, liquido e investito -->
+      <div class="balance-card" role="region" aria-label="Riepilogo Patrimonio">
+        <div class="main-balance">
+            <div class="label">Patrimonio Totale</div>
+            <div class="amount" id="totalBalance">€0.00</div>
+        </div>
+        <div>
+            <div class="label">Saldo Liquido</div>
+            <div class="amount" id="liquidBalance">€0.00</div>
+        </div>
+        <div>
+            <div class="label">Patrimonio Investito</div>
+            <div class="amount" id="investedBalance">€0.00</div>
+        </div>
       </div>
       <h3 style="margin-bottom:12px;">Transazioni Recenti</h3>
       <ul id="tx-list" class="tx-list" role="list" aria-label="Lista transazioni"></ul>
@@ -211,7 +224,7 @@ canvas{width:100% !important; height:100% !important; display:block;}
         <input type="hidden" id="editId">
         <div class="form-row"><label for="mDate">Data</label><input id="mDate" class="input" type="date"></div>
         <div class="form-row"><label for="mDesc">Descrizione</label><input id="mDesc" class="input"></div>
-        <div class="form-row"><label for="mAmt">Importo</label><input id="mAmt" class="input" type="number" step="0.01"></div>
+        <div class="form-row"><label for="mAmt">Importo (es. -100 per investire, 100 per disinvestire)</label><input id="mAmt" class="input" type="number" step="0.01"></div>
         <!-- <!-- MODIFICA: Aggiunto pulsante Investimento --> -->
         <div class="form-row">
             <label>Tipo</label>
@@ -245,7 +258,7 @@ canvas{width:100% !important; height:100% !important; display:block;}
 <script>
 (async function(){
     /* ---------- State & helpers ---------- */
-    const STORAGE = 'pf_pwa_v11_invest'; // Versione aggiornata
+    const STORAGE = 'pf_pwa_v12_invest_split'; // Versione aggiornata
     let state = { transactions:[], categories:[], recurring:[], deferredInstallPrompt:null };
     let calendarCurrentDate = new Date();
     let chartInstances = {}; // Store all chart instances
@@ -311,7 +324,18 @@ canvas{width:100% !important; height:100% !important; display:block;}
         if ($('graficiView')?.classList.contains('active')) { populateChartYearFilter(); updateCharts(); }
         if ($('calendarView')?.classList.contains('active')) renderCalendar();
     }
-    function renderBalance() { $('balance').textContent = fmt(state.transactions.reduce((s, t) => s + (t.amount || 0), 0)); }
+    // MODIFICA: Logica di calcolo del saldo aggiornata per separare liquidità e investimenti
+    function renderBalance() {
+        const liquidBalance = state.transactions.reduce((s, t) => s + (t.amount || 0), 0);
+        const investedBalance = state.transactions
+            .filter(t => t.type === 'investment')
+            .reduce((s, t) => s - t.amount, 0); // L'investimento (-100) aumenta il patrimonio investito di 100
+        const totalBalance = liquidBalance + investedBalance;
+        
+        $('liquidBalance').textContent = fmt(liquidBalance);
+        $('investedBalance').textContent = fmt(investedBalance);
+        $('totalBalance').textContent = fmt(totalBalance);
+    }
     function renderTransactionList(filterText = '', filterCat = '') {
         const list = $('tx-list'); const rows = state.transactions.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         const filtered = rows.filter(t => {
@@ -339,7 +363,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
     function destroyChart(id) { if(chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
     function renderChart(id, type, data, options = chartOptions) { destroyChart(id); const ctx = $(`#${id}`)?.getContext('2d'); if(ctx) chartInstances[id] = new Chart(ctx, { type, data, options }); }
     
-    // <!-- MODIFICA: Grafici mensili e annuali per includere investimenti -->
     function renderMonthlyChart(year) {
         const filteredTx = state.transactions.filter(t => t.date.startsWith(year));
         const monthly = {};
@@ -374,11 +397,9 @@ canvas{width:100% !important; height:100% !important; display:block;}
         ] };
         renderChart('yearlyChart', 'bar', data);
     }
-    // Fine modifica
 
     function renderCategoryChart(year) {
         const byCat = {};
-        // MODIFICA: Il filtro rimane t.type === 'expense' per mostrare solo le vere uscite
         state.transactions.filter(t => t.type === 'expense' && t.date.startsWith(year)).forEach(t => {
             const cat = t.category || 'Non categorizzato'; byCat[cat] = (byCat[cat] || 0) + Math.abs(t.amount || 0);
         });
@@ -387,14 +408,32 @@ canvas{width:100% !important; height:100% !important; display:block;}
         renderChart('categoryChart', 'pie', data, {...chartOptions, plugins: { legend: { position: 'bottom', labels: { color: '#e6efef' } }, tooltip: { callbacks: { label: c => `${c.label}: ${fmt(c.parsed)}` } } }});
     }
 
+    // MODIFICA: Grafico andamento ora mostra il patrimonio netto (non il saldo liquido) e la linea è bianca.
     function renderBalanceTrendChart(year) {
-        const initialBalance = state.transactions.filter(t => new Date(t.date).getFullYear() < year).reduce((sum, t) => sum + t.amount, 0);
+        const initialNetWorth = state.transactions
+            .filter(t => new Date(t.date).getFullYear() < year && t.type !== 'investment')
+            .reduce((sum, t) => sum + t.amount, 0);
+
         const yearTx = state.transactions.filter(t => t.date.startsWith(year)).sort((a,b) => a.date.localeCompare(b.date));
-        let runningBalance = initialBalance;
-        const dailyBalances = {};
-        for(const t of yearTx) { runningBalance += t.amount; dailyBalances[t.date] = runningBalance; }
-        const dataPoints = Object.entries(dailyBalances).map(([date, balance]) => ({x: new Date(date), y: balance}));
-        const data = { datasets: [{ label: 'Andamento Saldo', data: dataPoints, borderColor: 'var(--accent)', tension: 0.1, fill: false }] };
+        
+        let runningNetWorth = initialNetWorth;
+        const dailyNetWorth = {};
+
+        for(const t of yearTx) { 
+            if (t.type !== 'investment') { // Gli investimenti sono trasferimenti, non cambiano il patrimonio netto
+                runningNetWorth += t.amount; 
+            }
+            dailyNetWorth[t.date] = runningNetWorth; 
+        }
+
+        const dataPoints = Object.entries(dailyNetWorth).map(([date, balance]) => ({x: new Date(date), y: balance}));
+
+        // Aggiungi un punto all'inizio dell'anno per ancorare il grafico
+        if (dataPoints.length === 0 || new Date(dataPoints[0].x).getTime() > new Date(`${year}-01-01`).getTime()) {
+            dataPoints.unshift({ x: new Date(`${year}-01-01`), y: initialNetWorth });
+        }
+        
+        const data = { datasets: [{ label: 'Andamento Patrimonio', data: dataPoints, borderColor: '#e6efef', tension: 0.1, fill: false }] };
         const options = {...chartOptions, scales: { x: { type: 'time', time: { unit: 'month' }, ticks:{color:'#9fb0c9'}}, y: {ticks:{color:'#9fb0c9'}} }};
         renderChart('balanceTrendChart', 'line', data, options);
     }
@@ -419,10 +458,11 @@ canvas{width:100% !important; height:100% !important; display:block;}
     $('#chartYearFilter')?.addEventListener('change', updateCharts);
 
     /* ---------- Actions & OCR ---------- */
-    const addTransaction = (t) => { t.id=(Date.now() + Math.floor(Math.random()*1000)); state.transactions.push(t); save(); updateUI(); }
-    const updateTransaction = (t_new) => { const idx=state.transactions.findIndex(t=>t.id==t_new.id); if(idx>-1){state.transactions[idx]=t_new; save(); updateUI();}}
+    // BUG FIX: ID delle transazioni ora sono stringhe uniche per evitare conflitti.
+    const addTransaction = (t) => { t.id = 'tx_' + Date.now().toString(36) + Math.random().toString(36).substring(2); state.transactions.push(t); save(); updateUI(); }
+    const updateTransaction = (t_new) => { const idx=state.transactions.findIndex(t=>t.id===t_new.id); if(idx>-1){state.transactions[idx]=t_new; save(); updateUI();}}
     const deleteTransaction = (id) => {
-        const idx = state.transactions.findIndex(t => String(t.id) === String(id)); if (idx === -1) return;
+        const idx = state.transactions.findIndex(t => t.id === id); if (idx === -1) return;
         const [item] = state.transactions.splice(idx,1); save(); updateUI();
         lastDeleted = item;
         showToast('Transazione eliminata', 'Annulla', () => {
@@ -452,7 +492,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
     }
 
     /* ---------- Voice Recognition ---------- */
-    // <!-- MODIFICA: Riconoscimento vocale per "investimento" -->
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; const voiceBtn = $('#voiceBtn');
     if (!SpeechRecognition) { if(voiceBtn) voiceBtn.style.display = 'none'; } else {
         const recognition = new SpeechRecognition(); recognition.lang = 'it-IT'; recognition.interimResults = false;
@@ -484,7 +523,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
         addTransaction({ date: nowISO(), description, amount, type, category: guessCategory(description) || '' });
         showToast(`Aggiunto: ${description} (${fmt(amount)})`);
     }
-    // Fine modifica
 
     /* ---------- CSV import/export ---------- */
     $('importCsvBtn')?.addEventListener('click', () => $('file')?.click());
@@ -549,8 +587,9 @@ canvas{width:100% !important; height:100% !important; display:block;}
         const btn = e.target.closest('button'); if(!btn) return; const item = e.target.closest('.tx-item'); if(!item || !item.dataset.id) return;
         const id = item.dataset.id;
         if (btn.dataset.action === 'edit') {
-            const tx = state.transactions.find(t => String(t.id) === id); if(!tx) return;
-            $('#modalTitle').textContent = 'Modifica Transazione'; $('#editId').value = tx.id; $('#mDate').value = tx.date; $('#mDesc').value = tx.description; $('#mAmt').value = Math.abs(tx.amount); $('#mCat').value = tx.category||'';
+            // BUG FIX: la ricerca ora usa il confronto tra stringhe (t.id === id) che è più affidabile.
+            const tx = state.transactions.find(t => t.id === id); if(!tx) return;
+            $('#modalTitle').textContent = 'Modifica Transazione'; $('#editId').value = tx.id; $('#mDate').value = tx.date; $('#mDesc').value = tx.description; $('#mAmt').value = tx.amount; $('#mCat').value = tx.category||'';
             $('#typeToggle .btn').forEach(b => b.classList.toggle('active', b.dataset.type === tx.type));
             showModal('addModal');
         } else if (btn.dataset.action === 'delete' && confirm('Eliminare questa transazione?')) deleteTransaction(id);
@@ -558,22 +597,28 @@ canvas{width:100% !important; height:100% !important; display:block;}
     $('#typeToggle').addEventListener('click', e => { const b = e.target.closest('.btn'); if (!b) return; $('#typeToggle .btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); });
     $('cancelAdd')?.addEventListener('click', () => hideModal('addModal'));
     
-    // <!-- MODIFICA: Salvataggio per gestire il tipo "investment" -->
+    // MODIFICA: La logica di salvataggio gestisce correttamente i segni per i vari tipi di transazione.
     $('saveAdd')?.addEventListener('click', () => {
-        const id=$('#editId').value, type=$('#typeToggle .btn.active')?.dataset.type || 'expense'; 
+        const id=$('#editId').value;
+        const type=$('#typeToggle .btn.active')?.dataset.type || 'expense'; 
         let amt=parseAmount($('#mAmt').value);
         
-        if (type === 'expense' || type === 'investment') {
-            amt = -Math.abs(amt); // Sia uscite che investimenti sono negativi per il saldo
-        } else { // income
+        if (type === 'expense') {
+            amt = -Math.abs(amt);
+        } else if (type === 'income') {
             amt = Math.abs(amt);
         }
+        // Per 'investment', l'importo viene preso così com'è (negativo per acquistare, positivo per vendere).
 
-        const t = {id:id?Number(id):null,date:$('#mDate').value||nowISO(),description:$('#mDesc').value||'Manuale',amount:amt,type,category:$('#mCat').value||guessCategory($('#mDesc').value)||''};
-        if (id) updateTransaction(t); else addTransaction(t);
+        const t = { date:$('#mDate').value||nowISO(), description:$('#mDesc').value||'Manuale', amount:amt, type, category:$('#mCat').value||guessCategory($('#mDesc').value)||''};
+        if (id) {
+            t.id = id;
+            updateTransaction(t); 
+        } else {
+            addTransaction(t);
+        }
         hideModal('addModal');
     });
-    // Fine modifica
 
     /* ---------- Category Management ---------- */
     $('manageCatsBtn')?.addEventListener('click', () => { renderCategoryManagerList(); showModal('categoryModal'); });
@@ -634,11 +679,11 @@ canvas{width:100% !important; height:100% !important; display:block;}
             dayEl.dataset.date = dateStr; const dayTx = state.transactions.filter(t => t.date === dateStr);
             const income = dayTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
             const expense = dayTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-            const investment = dayTx.filter(t=>t.type==='investment').reduce((s,t)=>s+t.amount,0); // <!-- MODIFICA -->
+            const investment = dayTx.filter(t=>t.type==='investment').reduce((s,t)=>s+t.amount,0);
             let summaryHtml = '<div class="day-summary" style="font-size:0.75rem; text-align:right;">';
             if(income > 0) summaryHtml += `<div style="color:var(--success)">+${fmt(income)}</div>`; 
             if(expense < 0) summaryHtml += `<div style="color:var(--danger">${fmt(expense)}</div>`;
-            if(investment < 0) summaryHtml += `<div style="color:var(--warning">${fmt(investment)}</div>`; // <!-- MODIFICA -->
+            if(investment < 0) summaryHtml += `<div style="color:var(--warning">${fmt(investment)}</div>`;
             summaryHtml += '</div>'; dayEl.innerHTML = `<div class="day-number">${day}</div>${summaryHtml}`; grid.appendChild(dayEl);
         }
     }
@@ -684,13 +729,18 @@ canvas{width:100% !important; height:100% !important; display:block;}
 
     /* ---------- Init ---------- */
     async function init() {
-        load(); ensureDefaults(); updateUI();
-        registerServiceWorker();
+        load(); ensureDefaults();
+        // Clear old example transactions if they exist to avoid confusion
+        if(state.transactions.some(t => t.description?.includes('Esempio') && typeof t.id === 'number')) {
+            state.transactions = state.transactions.filter(t => !t.description?.includes('Esempio'));
+        }
         if (!state.transactions.length) {
             addTransaction({date:nowISO(),description:'Stipendio Esempio',amount:2500,type:'income',category:'Stipendio'});
             addTransaction({date:nowISO(),description:'Spesa di Esempio',amount:-74.23,type:'expense',category:'Supermercato'});
             addTransaction({date:nowISO(),description:'PAC Esempio',amount:-200,type:'investment',category:'Investimenti'});
         }
+        updateUI();
+        registerServiceWorker();
     }
     init();
 
