@@ -11,7 +11,7 @@
 <style>
 :root{
   --bg:#071023; --card:#0c1427; --muted:#8a9bb3; --accent:#06b6d4; --glass: rgba(255,255,255,0.03);
-  --success:#22c55e; --danger:#ef4444; --warning: #f97316; /* <!-- MODIFICA: Aggiunto colore per investimenti --> */
+  --success:#22c55e; --danger:#ef4444; --warning: #f97316;
   --radius:16px; --pad:16px; --shadow: 0 8px 30px rgba(2,6,23,0.6);
   --toast-bg: rgba(10,12,18,0.9);
 }
@@ -58,7 +58,7 @@ h1{font-size:1.15rem;margin:0}
 .tx-item .amount{font-weight:700; font-size:1.05rem;}
 .tx-item .amount.income{color:var(--success);}
 .tx-item .amount.expense{color:var(--danger);}
-.tx-item .amount.investment{color:var(--warning);} /* <!-- MODIFICA: Stile per importo investimento --> */
+.tx-item .amount.investment{color:var(--warning);}
 .tx-item .actions{display:flex; gap:8px; margin-top:6px; justify-content:flex-end;}
 
 /* Actions View */
@@ -68,8 +68,7 @@ h1{font-size:1.15rem;margin:0}
 .action-card:hover{background:rgba(255,255,255,0.04);}
 .action-card .icon{font-size:1.9rem; margin-bottom:8px;}
 .action-card .title{font-weight:600;}
-#resetAppBtn .icon, #resetAppBtn .title { color: var(--danger); } /* Stile per il pulsante di reset */
-
+#resetAppBtn .icon, #resetAppBtn .title { color: var(--danger); }
 
 /* Charts */
 .chart-filters{display:flex;gap:10px;align-items:center;margin-bottom:12px;background:var(--card);padding:8px;border-radius:12px;}
@@ -86,8 +85,11 @@ canvas{width:100% !important; height:100% !important; display:block;}
 #calendar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 #calendar-month-year{font-size:1.1rem;font-weight:700}
 #calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-.calendar-day{background:var(--card);border-radius:8px;min-height:80px;padding:8px;font-size:0.8rem; cursor:pointer;}
+/* BUG FIX: Stili per il calendario per prevenire lo spostamento delle celle */
+.calendar-day{background:var(--card);border-radius:8px;min-height:80px;padding:8px;font-size:0.8rem; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between;}
 .calendar-day.other-month{opacity:0.3; pointer-events:none;}
+.day-summary{font-size:0.75rem; text-align:right; white-space:nowrap; overflow:hidden;}
+.day-summary div{overflow:hidden; text-overflow:ellipsis;}
 
 /* FAB */
 .fab{position:fixed; bottom:110px; right:22px; width:56px; height:56px; border-radius:50%; background:var(--accent); color:var(--bg); border:none; font-size:1.9rem; display:flex; align-items:center; justify-content:center; box-shadow:0 12px 30px rgba(6, 182, 212, 0.22); z-index:40;}
@@ -146,7 +148,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
 
   <!-- VISTA HOME -->
   <div id="homeView" class="view active">
-      <!-- MODIFICA: La card del saldo ora mostra il patrimonio totale, liquido e investito -->
       <div class="balance-card" role="region" aria-label="Riepilogo Patrimonio">
         <div class="main-balance">
             <div class="label">Patrimonio Totale</div>
@@ -206,7 +207,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
           <div id="manageRecurringBtn" class="action-card" role="button" tabindex="0"><div class="icon">🔁</div><div class="title">Gestisci Ricorrenti</div></div>
           <div id="importCsvBtn" class="action-card" role="button" tabindex="0"><div class="icon">📁</div><div class="title">Importa CSV</div><input id="file" type="file" accept=".csv" style="display:none"></div>
           <div id="exportBackupBtn" class="action-card" role="button" tabindex="0"><div class="icon">💾</div><div class="title">Esporta Transazioni (CSV)</div></div>
-          <!-- MODIFICA: Aggiunto pulsante di reset -->
           <div id="resetAppBtn" class="action-card" role="button" tabindex="0"><div class="icon">⚠️</div><div class="title">Azzera Tutti i Dati</div></div>
       </div>
   </div>
@@ -227,9 +227,9 @@ canvas{width:100% !important; height:100% !important; display:block;}
         <h3 id="modalTitle"></h3>
         <input type="hidden" id="editId">
         <div class="form-row"><label for="mDate">Data</label><input id="mDate" class="input" type="date"></div>
-        <div class="form-row"><label for="mDesc">Descrizione</label><input id="mDesc" class="input"></div>
+        <!-- MODIFICA: Aggiunto attributo 'list' per l'autocompletamento -->
+        <div class="form-row"><label for="mDesc">Descrizione</label><input id="mDesc" class="input" list="description-suggestions"></div>
         <div class="form-row"><label for="mAmt">Importo (es. -100 per investire, 100 per disinvestire)</label><input id="mAmt" class="input" type="number" step="0.01"></div>
-        <!-- <!-- MODIFICA: Aggiunto pulsante Investimento --> -->
         <div class="form-row">
             <label>Tipo</label>
             <div class="type-toggle" id="typeToggle">
@@ -238,7 +238,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
                 <button class="btn" data-type="income" aria-pressed="false">Entrata</button>
             </div>
         </div>
-        <!-- Fine modifica -->
         <div class="form-row"><label for="mCat">Categoria</label><select id="mCat" class="input"></select></div>
         <div class="form-row" style="display:flex; gap:10px; margin-top:12px;">
             <button id="cancelAdd" class="btn" style="flex:1;">Annulla</button>
@@ -249,9 +248,13 @@ canvas{width:100% !important; height:100% !important; display:block;}
 
 <div id="categoryModal" class="modal" aria-hidden="true"><div class="modal-content" role="dialog" aria-modal="true"><h3>Gestisci Categorie</h3><div id="categoryList"></div><hr><input type="hidden" id="catId"><div class="form-row"><input id="catName" class="input" placeholder="Nome categoria"></div><div class="form-row"><input id="catIcon" class="input" placeholder="Icona (es. 🛒)"></div><div class="form-row" style="display:flex;gap:10px;"><button id="saveCat" class="btn primary" style="flex:1">Salva</button><button id="clearCatForm" class="btn" style="flex:1">Nuova</button></div></div></div>
 
-<div id="recurringModal" class="modal" aria-hidden="true"><div class="modal-content" role="dialog" aria-modal="true"><h3>Transazioni Ricorrenti</h3><div id="recurringList"></div><hr><h3>Aggiungi Ricorrente</h3><div class="form-row"><input id="rDesc" class="input" placeholder="Descrizione"></div><div class="form-row"><input id="rAmt" class="input" type="number" placeholder="Importo (es. -50 per uscita)"></div><div class="form-row"><select id="rFreq" class="input"><option value="weekly">Settimanale</option><option value="monthly">Mensile</option></select></div><div class="form-row"><label>Prossima data di esecuzione</label><input id="rDate" type="date" class="input"></div><div class="form-row"><button id="rAdd" class="btn primary">Aggiungi Ricorrente</button></div></div></div>
+<!-- MODIFICA: Modale per le transazioni ricorrenti aggiornata per la modifica -->
+<div id="recurringModal" class="modal" aria-hidden="true"><div class="modal-content" role="dialog" aria-modal="true"><h3>Transazioni Ricorrenti</h3><div id="recurringList"></div><hr><h3 id="recurringFormTitle">Aggiungi Ricorrente</h3><input type="hidden" id="rEditId"><div class="form-row"><input id="rDesc" class="input" placeholder="Descrizione"></div><div class="form-row"><input id="rAmt" class="input" type="number" placeholder="Importo (es. -50 per uscita)"></div><div class="form-row"><select id="rFreq" class="input"><option value="weekly">Settimanale</option><option value="monthly">Mensile</option></select></div><div class="form-row"><label>Prossima data di esecuzione</label><input id="rDate" type="date" class="input"></div><div class="form-row" style="display:flex;gap:10px;"><button id="rSave" class="btn primary" style="flex:2">Salva</button><button id="rClear" class="btn" style="flex:1">Nuova</button></div></div></div>
 
 <div id="dayDetailModal" class="modal" aria-hidden="true"><div class="modal-content" role="dialog" aria-modal="true"><h3 id="dayDetailTitle"></h3><div id="dayDetailList"></div></div></div>
+
+<!-- MODIFICA: Aggiunto Datalist per i suggerimenti di autocompletamento -->
+<datalist id="description-suggestions"></datalist>
 
 <!-- Toast area placeholder -->
 <div id="toastHolder" aria-live="polite" style="position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:1700"></div>
@@ -262,10 +265,10 @@ canvas{width:100% !important; height:100% !important; display:block;}
 <script>
 (async function(){
     /* ---------- State & helpers ---------- */
-    const STORAGE = 'pf_pwa_v12_invest_split'; // Versione aggiornata
+    const STORAGE = 'pf_pwa_v13_autocomplete'; // Versione aggiornata
     let state = { transactions:[], categories:[], recurring:[], deferredInstallPrompt:null };
     let calendarCurrentDate = new Date();
-    let chartInstances = {}; // Store all chart instances
+    let chartInstances = {};
     let lastDeleted = null, undoTimeout = null;
     const $ = (sel) => {
         if (!sel) return null; if (typeof sel !== 'string') return sel; if (/^[a-zA-Z0-9_\-]+$/.test(sel)) return document.getElementById(sel);
@@ -325,16 +328,14 @@ canvas{width:100% !important; height:100% !important; display:block;}
     /* ---------- Renderers ---------- */
     function updateUI() {
         renderTransactionList(); renderBalance(); renderCategoriesSelect(); refreshCategoryFilterOptions();
+        renderAutocompleteDatalist();
         if ($('graficiView')?.classList.contains('active')) { populateChartYearFilter(); updateCharts(); }
         if ($('calendarView')?.classList.contains('active')) renderCalendar();
     }
     function renderBalance() {
         const liquidBalance = state.transactions.reduce((s, t) => s + (t.amount || 0), 0);
-        const investedBalance = state.transactions
-            .filter(t => t.type === 'investment')
-            .reduce((s, t) => s - t.amount, 0);
+        const investedBalance = state.transactions.filter(t => t.type === 'investment').reduce((s, t) => s - t.amount, 0);
         const totalBalance = liquidBalance + investedBalance;
-        
         $('liquidBalance').textContent = fmt(liquidBalance);
         $('investedBalance').textContent = fmt(investedBalance);
         $('totalBalance').textContent = fmt(totalBalance);
@@ -359,6 +360,13 @@ canvas{width:100% !important; height:100% !important; display:block;}
         const f = $('categoryFilter'); if (!f) return; const cur = f.value;
         f.innerHTML = `<option value="">Tutte le categorie</option>` + state.categories.map(c => `<option value="${escapeHtml(c.name)}">${c.icon} ${escapeHtml(c.name)}</option>`).join('');
         f.value = cur || '';
+    }
+    // MODIFICA: Nuova funzione per popolare il datalist di autocompletamento
+    function renderAutocompleteDatalist() {
+        const datalist = $('#description-suggestions');
+        if (!datalist) return;
+        const descriptions = [...new Set(state.transactions.map(t => t.description))];
+        datalist.innerHTML = descriptions.map(d => `<option value="${escapeHtml(d)}"></option>`).join('');
     }
 
     /* ---------- Charts ---------- */
@@ -412,28 +420,18 @@ canvas{width:100% !important; height:100% !important; display:block;}
     }
 
     function renderBalanceTrendChart(year) {
-        const initialNetWorth = state.transactions
-            .filter(t => new Date(t.date).getFullYear() < year && t.type !== 'investment')
-            .reduce((sum, t) => sum + t.amount, 0);
-
+        const initialNetWorth = state.transactions.filter(t => new Date(t.date).getFullYear() < year && t.type !== 'investment').reduce((sum, t) => sum + t.amount, 0);
         const yearTx = state.transactions.filter(t => t.date.startsWith(year)).sort((a,b) => a.date.localeCompare(b.date));
-        
         let runningNetWorth = initialNetWorth;
         const dailyNetWorth = {};
-
         for(const t of yearTx) { 
-            if (t.type !== 'investment') {
-                runningNetWorth += t.amount; 
-            }
+            if (t.type !== 'investment') { runningNetWorth += t.amount; }
             dailyNetWorth[t.date] = runningNetWorth; 
         }
-
         const dataPoints = Object.entries(dailyNetWorth).map(([date, balance]) => ({x: new Date(date), y: balance}));
-
         if (dataPoints.length === 0 || new Date(dataPoints[0].x).getTime() > new Date(`${year}-01-01`).getTime()) {
             dataPoints.unshift({ x: new Date(`${year}-01-01`), y: initialNetWorth });
         }
-        
         const data = { datasets: [{ label: 'Andamento Patrimonio', data: dataPoints, borderColor: '#e6efef', tension: 0.1, fill: false }] };
         const options = {...chartOptions, scales: { x: { type: 'time', time: { unit: 'month' }, ticks:{color:'#9fb0c9'}}, y: {ticks:{color:'#9fb0c9'}} }};
         renderChart('balanceTrendChart', 'line', data, options);
@@ -503,23 +501,16 @@ canvas{width:100% !important; height:100% !important; display:block;}
         const amountRegex = /(?:(\d+([.,]\d{1,2})?)\s*(euro|eur|€)|(euro|eur|€)\s*(\d+([.,]\d{1,2})?)|(un|una)\s*euro)/i;
         const amountMatch = transcript.match(amountRegex);
         if (!amountMatch) { showToast('Importo non capito. Prova a dire "spesa di 10 euro per caffè".'); return; }
-
         let amount = 0;
         if (amountMatch[1]) amount = parseFloat(amountMatch[1].replace(',', '.'));
         else if (amountMatch[5]) amount = parseFloat(amountMatch[5].replace(',', '.'));
         else if (amountMatch[7]) amount = 1;
-
-        let type = 'expense'; // Default
+        let type = 'expense';
         if (/(investi|investimento|accumulo|pac)/i.test(transcript)) type = 'investment';
         else if (/(entrata|accredito|ricevuto|guadagnato)/i.test(transcript)) type = 'income';
-
         if (type !== 'income') amount = -Math.abs(amount); else amount = Math.abs(amount);
-
-        let description = transcript.replace(amountRegex, '')
-            .replace(/(aggiungi|registra|nuova|nuovo|spesa|costo|uscita|entrata|accredito|investimento|di|per|da)/gi, '')
-            .replace(/\s\s+/g, ' ').trim();
+        let description = transcript.replace(amountRegex, '').replace(/(aggiungi|registra|nuova|nuovo|spesa|costo|uscita|entrata|accredito|investimento|di|per|da)/gi, '').replace(/\s\s+/g, ' ').trim();
         description = description.charAt(0).toUpperCase() + description.slice(1) || 'Transazione vocale';
-
         addTransaction({ date: nowISO(), description, amount, type, category: guessCategory(description) || '' });
         showToast(`Aggiunto: ${description} (${fmt(amount)})`);
     }
@@ -534,53 +525,30 @@ canvas{width:100% !important; height:100% !important; display:block;}
             else { showToast('Nessuna transazione valida trovata'); }
         };
         r.readAsText(f);
-        e.target.value = ''; // Reset input
+        e.target.value = '';
     });
-
     function parseCSV(text) {
-        const rows = [];
-        const lines = text.split(/\r?\n/);
-        if (lines.length < 2) return rows;
+        const rows = []; const lines = text.split(/\r?\n/); if (lines.length < 2) return rows;
         const sep = lines[0].includes(';') ? ';' : ',';
         const header = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/"/g, ''));
-
         for (let i = 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
             const cols = lines[i].split(sep).map(c => c.trim().replace(/"/g, ''));
-            const obj = {};
-            header.forEach((h, idx) => obj[h] = cols[idx] || '');
-
+            const obj = {}; header.forEach((h, idx) => obj[h] = cols[idx] || '');
             const description = obj.description || obj.descrizione || '';
             const date = obj.date || obj.data || '';
-            
             if (!date || !description) continue;
-
             let amount = parseAmount(obj.amount || obj.importo || '0');
             let type = (obj.type || obj.tipo || '').toLowerCase();
-
-            if (!['income', 'expense', 'investment'].includes(type)) {
-                type = amount >= 0 ? 'income' : 'expense';
-            }
-            
+            if (!['income', 'expense', 'investment'].includes(type)) { type = amount >= 0 ? 'income' : 'expense'; }
             if (type === 'expense' && amount > 0) amount = -amount;
             if (type === 'income' && amount < 0) amount = Math.abs(amount);
-
             let category = obj.category || obj.categoria || '';
-            if (!category || category.trim() === '-' || category.trim() === '') {
-                category = guessCategory(description);
-            }
-
-            rows.push({
-                date: date.slice(0, 10),
-                description: description,
-                amount: amount,
-                type: type,
-                category: category
-            });
+            if (!category || category.trim() === '-' || category.trim() === '') { category = guessCategory(description); }
+            rows.push({ date: date.slice(0, 10), description, amount, type, category });
         }
         return rows;
     }
-
     function exportTransactionsToCSV() {
         if (!state.transactions || !state.transactions.length) return showToast('Nessuna transazione da esportare');
         const header = ['date', 'description', 'amount', 'type', 'category'];
@@ -593,29 +561,13 @@ canvas{width:100% !important; height:100% !important; display:block;}
     }
     $('exportBackupBtn')?.addEventListener('click', exportTransactionsToCSV);
 
-    // MODIFICA: Aggiunto event listener per il pulsante di reset
     $('resetAppBtn')?.addEventListener('click', () => {
-        const confirmation = confirm("Sei assolutamente sicuro? Tutti i dati (transazioni, categorie, ecc.) verranno eliminati in modo permanente. Questa azione non può essere annullata.");
-        if (confirmation) {
-            // Svuota lo stato
-            state.transactions = [];
-            state.categories = [];
-            state.recurring = [];
-            
-            // Salva lo stato svuotato (questo cancella i dati in localStorage)
-            save();
-            
-            // Ricarica le categorie di default
-            ensureDefaults();
-            
-            // Aggiorna l'interfaccia utente
-            updateUI();
-            
-            // Notifica l'utente
+        if (confirm("Sei assolutamente sicuro? Tutti i dati (transazioni, categorie, ecc.) verranno eliminati in modo permanente. Questa azione non può essere annullata.")) {
+            state.transactions = []; state.categories = []; state.recurring = [];
+            save(); ensureDefaults(); updateUI();
             showToast('Tutti i dati sono stati azzerati.');
         }
     });
-
 
     /* ---------- View & Modal Management ---------- */
     const views = $('.view'), navBtns = $('.nav-btn');
@@ -649,25 +601,12 @@ canvas{width:100% !important; height:100% !important; display:block;}
     });
     $('#typeToggle').addEventListener('click', e => { const b = e.target.closest('.btn'); if (!b) return; $('#typeToggle .btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); });
     $('cancelAdd')?.addEventListener('click', () => hideModal('addModal'));
-    
     $('saveAdd')?.addEventListener('click', () => {
-        const id=$('#editId').value;
-        const type=$('#typeToggle .btn.active')?.dataset.type || 'expense'; 
+        const id=$('#editId').value, type=$('#typeToggle .btn.active')?.dataset.type || 'expense'; 
         let amt=parseAmount($('#mAmt').value);
-        
-        if (type === 'expense') {
-            amt = -Math.abs(amt);
-        } else if (type === 'income') {
-            amt = Math.abs(amt);
-        }
-
+        if (type === 'expense') amt = -Math.abs(amt); else if (type === 'income') amt = Math.abs(amt);
         const t = { date:$('#mDate').value||nowISO(), description:$('#mDesc').value||'Manuale', amount:amt, type, category:$('#mCat').value||guessCategory($('#mDesc').value)||''};
-        if (id) {
-            t.id = id;
-            updateTransaction(t); 
-        } else {
-            addTransaction(t);
-        }
+        if (id) { t.id = id; updateTransaction(t); } else { addTransaction(t); }
         hideModal('addModal');
     });
 
@@ -690,34 +629,44 @@ canvas{width:100% !important; height:100% !important; display:block;}
         save(); renderCategoryManagerList(); updateUI(); $('#catId').value = ''; $('#catName').value = ''; $('#catIcon').value = '';
     });
     
-    /* ---------- Recurring Transactions ---------- */
-    $('manageRecurringBtn')?.addEventListener('click', () => { renderRecurringList(); showModal('recurringModal'); });
+    /* ---------- Recurring Transactions (MODIFIED for editing) ---------- */
+    $('manageRecurringBtn')?.addEventListener('click', () => { renderRecurringList(); clearRecurringForm(); showModal('recurringModal'); });
     function renderRecurringList() {
-        $('#recurringList').innerHTML = (state.recurring || []).map(r => `<div class="row" style="justify-content:space-between; padding: 4px 0;" data-id="${r.id}"><span>${escapeHtml(r.description)} (${fmt(r.amount)}) - Prossima: ${r.nextDueDate}</span><div><button class="btn-sm" data-action="run-now" data-id="${r.id}" title="Esegui ora">▶️</button><button class="btn-sm" data-action="delete-rec" data-id="${r.id}" title="Elimina">🗑️</button></div></div>`).join('') || "<p>Nessuna transazione ricorrente.</p>";
+        $('#recurringList').innerHTML = (state.recurring || []).map(r => `<div class="row" style="justify-content:space-between; padding: 4px 0;" data-id="${r.id}"><span>${escapeHtml(r.description)} (${fmt(r.amount)}) - Prossima: ${r.nextDueDate}</span><div><button class="btn-sm" data-action="edit-rec" data-id="${r.id}" title="Modifica">✏️</button><button class="btn-sm" data-action="run-now" data-id="${r.id}" title="Esegui ora">▶️</button><button class="btn-sm" data-action="delete-rec" data-id="${r.id}" title="Elimina">🗑️</button></div></div>`).join('') || "<p>Nessuna transazione ricorrente.</p>";
+    }
+    function clearRecurringForm() {
+        $('#rEditId').value = ''; $('#rDesc').value = ''; $('#rAmt').value = ''; $('#rDate').value = '';
+        $('#recurringFormTitle').textContent = 'Aggiungi Ricorrente'; $('#rSave').textContent = 'Salva';
     }
     $('#recurringList')?.addEventListener('click', e => {
         const btn = e.target.closest('button[data-action]'); if (!btn) return;
-        const id = btn.dataset.id; const action = btn.dataset.action;
-        if (action === 'delete-rec') {
-            state.recurring = (state.recurring || []).filter(r => String(r.id) != String(id));
-            save(); renderRecurringList();
-        } else if (action === 'run-now') {
-            const rec = (state.recurring || []).find(r => String(r.id) === String(id));
-            if (rec) {
-                 const type = rec.amount >= 0 ? 'income' : (guessCategory(rec.description) === 'Investimenti' ? 'investment' : 'expense');
-                 addTransaction({ date: nowISO(), description: rec.description, amount: rec.amount, type: type, category: rec.category || guessCategory(rec.description) }); showToast(`Eseguita ricorrente: ${rec.description}`); 
-            }
+        const id = btn.dataset.id, action = btn.dataset.action;
+        const recItem = (state.recurring || []).find(r => r.id === id);
+        if (action === 'delete-rec') { state.recurring = (state.recurring || []).filter(r => r.id !== id); save(); renderRecurringList(); } 
+        else if (action === 'run-now' && recItem) { const type = recItem.amount >= 0 ? 'income' : (guessCategory(recItem.description) === 'Investimenti' ? 'investment' : 'expense'); addTransaction({ date: nowISO(), description: recItem.description, amount: recItem.amount, type: type, category: recItem.category || guessCategory(recItem.description) }); showToast(`Eseguita ricorrente: ${recItem.description}`); }
+        else if (action === 'edit-rec' && recItem) {
+            $('#rEditId').value = recItem.id; $('#rDesc').value = recItem.description; $('#rAmt').value = recItem.amount;
+            $('#rFreq').value = recItem.frequency; $('#rDate').value = recItem.nextDueDate;
+            $('#recurringFormTitle').textContent = 'Modifica Ricorrente'; $('#rSave').textContent = 'Salva Modifiche';
         }
     });
-    $('rAdd')?.addEventListener('click', () => {
-        const desc = $('#rDesc').value.trim(), amt = parseAmount($('#rAmt').value), freq = $('#rFreq').value, date = $('#rDate').value;
+    $('rClear')?.addEventListener('click', clearRecurringForm);
+    $('rSave')?.addEventListener('click', () => {
+        const id = $('#rEditId').value, desc = $('#rDesc').value.trim(), amt = parseAmount($('#rAmt').value), freq = $('#rFreq').value, date = $('#rDate').value;
         if (!desc || isNaN(amt) || !date) return showToast('Compila tutti i campi.');
         if (!state.recurring) state.recurring = [];
-        state.recurring.push({ id: 'rec_' + Date.now(), description: desc, amount: amt, frequency: freq, nextDueDate: date, category: guessCategory(desc) });
-        save(); renderRecurringList(); $('#rDesc').value = ''; $('#rAmt').value = ''; $('#rDate').value = '';
+        const newItem = { description: desc, amount: amt, frequency: freq, nextDueDate: date, category: guessCategory(desc) };
+        if (id) {
+            const index = state.recurring.findIndex(r => r.id === id);
+            if (index > -1) { state.recurring[index] = { ...state.recurring[index], ...newItem }; }
+        } else {
+            newItem.id = 'rec_' + Date.now();
+            state.recurring.push(newItem);
+        }
+        save(); renderRecurringList(); clearRecurringForm();
     });
 
-    /* ---------- Calendar ---------- */
+    /* ---------- Calendar (MODIFIED for layout fix) ---------- */
     function renderCalendar() {
         const year = calendarCurrentDate.getFullYear(), month = calendarCurrentDate.getMonth();
         $('#calendar-month-year').textContent = new Date(year, month).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
@@ -728,14 +677,18 @@ canvas{width:100% !important; height:100% !important; display:block;}
         for (let day = 1; day <= daysInMonth; day++) {
             const dayEl = document.createElement('div'); dayEl.className='calendar-day'; const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
             dayEl.dataset.date = dateStr; const dayTx = state.transactions.filter(t => t.date === dateStr);
-            const income = dayTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-            const expense = dayTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-            const investment = dayTx.filter(t=>t.type==='investment').reduce((s,t)=>s+t.amount,0);
-            let summaryHtml = '<div class="day-summary" style="font-size:0.75rem; text-align:right;">';
-            if(income > 0) summaryHtml += `<div style="color:var(--success)">+${fmt(income)}</div>`; 
-            if(expense < 0) summaryHtml += `<div style="color:var(--danger">${fmt(expense)}</div>`;
-            if(investment < 0) summaryHtml += `<div style="color:var(--warning">${fmt(investment)}</div>`;
-            summaryHtml += '</div>'; dayEl.innerHTML = `<div class="day-number">${day}</div>${summaryHtml}`; grid.appendChild(dayEl);
+            let summaryHtml = '';
+            if (dayTx.length > 0) {
+                const income = dayTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+                const expense = dayTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+                const investment = dayTx.filter(t=>t.type==='investment').reduce((s,t)=>s+t.amount,0);
+                summaryHtml = '<div class="day-summary">';
+                if(income > 0) summaryHtml += `<div style="color:var(--success)">+${fmt(income)}</div>`; 
+                if(expense < 0) summaryHtml += `<div style="color:var(--danger">${fmt(expense)}</div>`;
+                if(investment < 0) summaryHtml += `<div style="color:var(--warning">${fmt(investment)}</div>`;
+                summaryHtml += '</div>';
+            }
+            dayEl.innerHTML = `<div class="day-number">${day}</div>${summaryHtml}`; grid.appendChild(dayEl);
         }
     }
     $('#prev-month-btn')?.addEventListener('click', () => { calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() - 1); renderCalendar(); });
@@ -759,7 +712,7 @@ canvas{width:100% !important; height:100% !important; display:block;}
     $('#installBtn').addEventListener('click', async () => {
         const promptEvent = state.deferredInstallPrompt; if (!promptEvent) return;
         promptEvent.prompt(); const { outcome } = await promptEvent.userChoice;
-        console.log(`User response to the install prompt: ${outcome}`); state.deferredInstallPrompt = null; $('#installBtn').classList.add('hidden');
+        state.deferredInstallPrompt = null; $('#installBtn').classList.add('hidden');
     });
 
     /* ---------- Service Worker Registration for Offline Capability ---------- */
@@ -772,9 +725,7 @@ canvas{width:100% !important; height:100% !important; display:block;}
                 self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./')))));
             `;
             const blob = new Blob([swContent], { type: 'application/javascript' });
-            navigator.serviceWorker.register(URL.createObjectURL(blob))
-                .then(reg => console.log('Service Worker registered.'))
-                .catch(err => console.error('Service Worker registration failed:', err));
+            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.error('SW reg failed:', err));
         }
     }
 
