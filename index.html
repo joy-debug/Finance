@@ -68,6 +68,8 @@ h1{font-size:1.15rem;margin:0}
 .action-card:hover{background:rgba(255,255,255,0.04);}
 .action-card .icon{font-size:1.9rem; margin-bottom:8px;}
 .action-card .title{font-weight:600;}
+#resetAppBtn .icon, #resetAppBtn .title { color: var(--danger); } /* Stile per il pulsante di reset */
+
 
 /* Charts */
 .chart-filters{display:flex;gap:10px;align-items:center;margin-bottom:12px;background:var(--card);padding:8px;border-radius:12px;}
@@ -204,6 +206,8 @@ canvas{width:100% !important; height:100% !important; display:block;}
           <div id="manageRecurringBtn" class="action-card" role="button" tabindex="0"><div class="icon">🔁</div><div class="title">Gestisci Ricorrenti</div></div>
           <div id="importCsvBtn" class="action-card" role="button" tabindex="0"><div class="icon">📁</div><div class="title">Importa CSV</div><input id="file" type="file" accept=".csv" style="display:none"></div>
           <div id="exportBackupBtn" class="action-card" role="button" tabindex="0"><div class="icon">💾</div><div class="title">Esporta Transazioni (CSV)</div></div>
+          <!-- MODIFICA: Aggiunto pulsante di reset -->
+          <div id="resetAppBtn" class="action-card" role="button" tabindex="0"><div class="icon">⚠️</div><div class="title">Azzera Tutti i Dati</div></div>
       </div>
   </div>
 </div>
@@ -324,12 +328,11 @@ canvas{width:100% !important; height:100% !important; display:block;}
         if ($('graficiView')?.classList.contains('active')) { populateChartYearFilter(); updateCharts(); }
         if ($('calendarView')?.classList.contains('active')) renderCalendar();
     }
-    // MODIFICA: Logica di calcolo del saldo aggiornata per separare liquidità e investimenti
     function renderBalance() {
         const liquidBalance = state.transactions.reduce((s, t) => s + (t.amount || 0), 0);
         const investedBalance = state.transactions
             .filter(t => t.type === 'investment')
-            .reduce((s, t) => s - t.amount, 0); // L'investimento (-100) aumenta il patrimonio investito di 100
+            .reduce((s, t) => s - t.amount, 0);
         const totalBalance = liquidBalance + investedBalance;
         
         $('liquidBalance').textContent = fmt(liquidBalance);
@@ -408,7 +411,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
         renderChart('categoryChart', 'pie', data, {...chartOptions, plugins: { legend: { position: 'bottom', labels: { color: '#e6efef' } }, tooltip: { callbacks: { label: c => `${c.label}: ${fmt(c.parsed)}` } } }});
     }
 
-    // MODIFICA: Grafico andamento ora mostra il patrimonio netto (non il saldo liquido) e la linea è bianca.
     function renderBalanceTrendChart(year) {
         const initialNetWorth = state.transactions
             .filter(t => new Date(t.date).getFullYear() < year && t.type !== 'investment')
@@ -420,7 +422,7 @@ canvas{width:100% !important; height:100% !important; display:block;}
         const dailyNetWorth = {};
 
         for(const t of yearTx) { 
-            if (t.type !== 'investment') { // Gli investimenti sono trasferimenti, non cambiano il patrimonio netto
+            if (t.type !== 'investment') {
                 runningNetWorth += t.amount; 
             }
             dailyNetWorth[t.date] = runningNetWorth; 
@@ -428,7 +430,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
 
         const dataPoints = Object.entries(dailyNetWorth).map(([date, balance]) => ({x: new Date(date), y: balance}));
 
-        // Aggiungi un punto all'inizio dell'anno per ancorare il grafico
         if (dataPoints.length === 0 || new Date(dataPoints[0].x).getTime() > new Date(`${year}-01-01`).getTime()) {
             dataPoints.unshift({ x: new Date(`${year}-01-01`), y: initialNetWorth });
         }
@@ -458,7 +459,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
     $('#chartYearFilter')?.addEventListener('change', updateCharts);
 
     /* ---------- Actions & OCR ---------- */
-    // BUG FIX: ID delle transazioni ora sono stringhe uniche per evitare conflitti.
     const addTransaction = (t) => { t.id = 'tx_' + Date.now().toString(36) + Math.random().toString(36).substring(2); state.transactions.push(t); save(); updateUI(); }
     const updateTransaction = (t_new) => { const idx=state.transactions.findIndex(t=>t.id===t_new.id); if(idx>-1){state.transactions[idx]=t_new; save(); updateUI();}}
     const deleteTransaction = (id) => {
@@ -534,23 +534,53 @@ canvas{width:100% !important; height:100% !important; display:block;}
             else { showToast('Nessuna transazione valida trovata'); }
         };
         r.readAsText(f);
+        e.target.value = ''; // Reset input
     });
+
     function parseCSV(text) {
-        const rows = []; const lines = text.split(/\r?\n/); if(!lines.length) return rows; const sep = lines[0].includes(';') ? ';' : ',';
-        const header = lines[0].split(sep).map(h => h.trim().toLowerCase());
-        for(let i=1; i<lines.length; i++) {
-            if(!lines[i].trim()) continue; const cols = lines[i].split(sep); const obj = {}; header.forEach((h,idx) => obj[h] = cols[idx] || '');
-            let amount = parseAmount(obj.amount || obj.importo || '0'); 
-            let type = (obj.type || '').toLowerCase();
+        const rows = [];
+        const lines = text.split(/\r?\n/);
+        if (lines.length < 2) return rows;
+        const sep = lines[0].includes(';') ? ';' : ',';
+        const header = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/"/g, ''));
+
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const cols = lines[i].split(sep).map(c => c.trim().replace(/"/g, ''));
+            const obj = {};
+            header.forEach((h, idx) => obj[h] = cols[idx] || '');
+
+            const description = obj.description || obj.descrizione || '';
+            const date = obj.date || obj.data || '';
+            
+            if (!date || !description) continue;
+
+            let amount = parseAmount(obj.amount || obj.importo || '0');
+            let type = (obj.type || obj.tipo || '').toLowerCase();
+
             if (!['income', 'expense', 'investment'].includes(type)) {
                 type = amount >= 0 ? 'income' : 'expense';
             }
-            if (type !== 'income' && amount > 0) amount = -amount; 
-            if(!obj.date || !obj.description) continue;
-            rows.push({ date: obj.date.slice(0,10), description: obj.description, amount, type, category: obj.category || guessCategory(obj.description)});
+            
+            if (type === 'expense' && amount > 0) amount = -amount;
+            if (type === 'income' && amount < 0) amount = Math.abs(amount);
+
+            let category = obj.category || obj.categoria || '';
+            if (!category || category.trim() === '-' || category.trim() === '') {
+                category = guessCategory(description);
+            }
+
+            rows.push({
+                date: date.slice(0, 10),
+                description: description,
+                amount: amount,
+                type: type,
+                category: category
+            });
         }
         return rows;
     }
+
     function exportTransactionsToCSV() {
         if (!state.transactions || !state.transactions.length) return showToast('Nessuna transazione da esportare');
         const header = ['date', 'description', 'amount', 'type', 'category'];
@@ -562,6 +592,30 @@ canvas{width:100% !important; height:100% !important; display:block;}
         showToast('CSV esportato con successo');
     }
     $('exportBackupBtn')?.addEventListener('click', exportTransactionsToCSV);
+
+    // MODIFICA: Aggiunto event listener per il pulsante di reset
+    $('resetAppBtn')?.addEventListener('click', () => {
+        const confirmation = confirm("Sei assolutamente sicuro? Tutti i dati (transazioni, categorie, ecc.) verranno eliminati in modo permanente. Questa azione non può essere annullata.");
+        if (confirmation) {
+            // Svuota lo stato
+            state.transactions = [];
+            state.categories = [];
+            state.recurring = [];
+            
+            // Salva lo stato svuotato (questo cancella i dati in localStorage)
+            save();
+            
+            // Ricarica le categorie di default
+            ensureDefaults();
+            
+            // Aggiorna l'interfaccia utente
+            updateUI();
+            
+            // Notifica l'utente
+            showToast('Tutti i dati sono stati azzerati.');
+        }
+    });
+
 
     /* ---------- View & Modal Management ---------- */
     const views = $('.view'), navBtns = $('.nav-btn');
@@ -587,7 +641,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
         const btn = e.target.closest('button'); if(!btn) return; const item = e.target.closest('.tx-item'); if(!item || !item.dataset.id) return;
         const id = item.dataset.id;
         if (btn.dataset.action === 'edit') {
-            // BUG FIX: la ricerca ora usa il confronto tra stringhe (t.id === id) che è più affidabile.
             const tx = state.transactions.find(t => t.id === id); if(!tx) return;
             $('#modalTitle').textContent = 'Modifica Transazione'; $('#editId').value = tx.id; $('#mDate').value = tx.date; $('#mDesc').value = tx.description; $('#mAmt').value = tx.amount; $('#mCat').value = tx.category||'';
             $('#typeToggle .btn').forEach(b => b.classList.toggle('active', b.dataset.type === tx.type));
@@ -597,7 +650,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
     $('#typeToggle').addEventListener('click', e => { const b = e.target.closest('.btn'); if (!b) return; $('#typeToggle .btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); });
     $('cancelAdd')?.addEventListener('click', () => hideModal('addModal'));
     
-    // MODIFICA: La logica di salvataggio gestisce correttamente i segni per i vari tipi di transazione.
     $('saveAdd')?.addEventListener('click', () => {
         const id=$('#editId').value;
         const type=$('#typeToggle .btn.active')?.dataset.type || 'expense'; 
@@ -608,7 +660,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
         } else if (type === 'income') {
             amt = Math.abs(amt);
         }
-        // Per 'investment', l'importo viene preso così com'è (negativo per acquistare, positivo per vendere).
 
         const t = { date:$('#mDate').value||nowISO(), description:$('#mDesc').value||'Manuale', amount:amt, type, category:$('#mCat').value||guessCategory($('#mDesc').value)||''};
         if (id) {
@@ -730,7 +781,6 @@ canvas{width:100% !important; height:100% !important; display:block;}
     /* ---------- Init ---------- */
     async function init() {
         load(); ensureDefaults();
-        // Clear old example transactions if they exist to avoid confusion
         if(state.transactions.some(t => t.description?.includes('Esempio') && typeof t.id === 'number')) {
             state.transactions = state.transactions.filter(t => !t.description?.includes('Esempio'));
         }
